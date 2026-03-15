@@ -1,171 +1,171 @@
 # /run-pipeline
 
-ニュース取得または論文取得から YouTube 投稿まで全ステージを順次実行する。
+Run all stages sequentially from news/paper fetch through YouTube upload.
 
-## 引数
+## Arguments
 
-- `--mode news|paper`: 実行モード（デフォルト: `news`）
-  - `news`: 海外テックニュース記事モード（従来動作）
-  - `paper`: 最新技術論文モード（arXiv + HF Daily Papers）
-- `--dry-run` / `--skip-upload`: 動画生成まで実行し、YouTube 投稿をスキップ
-- `--from-stage N`: ステージ N から再開（1=fetch, 2=process, 3=script, 4=video, 5=upload）
-- `--run-id ID`: 実行ID（省略時は自動生成済み）。キャッシュパスは `.cache/pipeline/{run_id}/` になる
-- `--publish-at ISO8601`: YouTube 公開スケジュール時刻（UTC ISO 8601 形式）。例: `2026-03-12T23:00:00Z`
+- `--mode news|paper`: execution mode (default: `news`)
+  - `news`: tech news article mode
+  - `paper`: latest research paper mode (arXiv + HF Daily Papers)
+- `--dry-run` / `--skip-upload`: run through video generation, skip YouTube upload
+- `--from-stage N`: resume from stage N (1=fetch, 2=process, 3=script, 4=video, 5=upload)
+- `--run-id ID`: run ID (auto-generated if omitted). Cache paths become `.cache/pipeline/{run_id}/`
+- `--publish-at ISO8601`: YouTube scheduled publish time (UTC ISO 8601). e.g., `2026-03-12T23:00:00Z`
 
-## 実行手順
+## Execution steps
 
-引数を確認して開始ステージと実行モードを決定し、各ステージを順次実行する。
+Check arguments, determine the starting stage and mode, then run each stage in sequence.
 
-`--run-id` が指定された場合、以下の全ファイルパスの `.cache/pipeline/` を `.cache/pipeline/{run_id}/` に読み替えて実行する。
+If `--run-id` is specified, replace `.cache/pipeline/` with `.cache/pipeline/{run_id}/` in all file paths below.
 
-### ステージ 1: 取得
+### Stage 1: Fetch
 
-**`--mode news`（デフォルト）の場合**、/fetch-news コマンドを実行:
+**`--mode news` (default)**, run /fetch-news:
 ```bash
-cd /c/Users/furag/Documents/prog/python/news_video_maker && uv run python -m news_video_maker.fetcher.rss
+cd /c/Users/furag/Documents/prog/python/news_video_maker_en && uv run python -m news_video_maker.fetcher.rss
 ```
-完了後、`.cache/pipeline/{run_id}/01_articles.json` を読み込み、配列が空（`[]`）なら「新規記事なし」として後続ステージをスキップし、report.md に「新規記事なし: 処理済み記事のみのため終了」と記録して終了する。
+After completion, read `.cache/pipeline/{run_id}/01_articles.json`. If the array is empty (`[]`), skip subsequent stages and write "No new articles: only previously processed articles found" to report.md, then stop.
 
-**`--mode paper` の場合**、/fetch-papers コマンドを実行:
+**`--mode paper`**, run /fetch-papers:
 ```bash
-cd /c/Users/furag/Documents/prog/python/news_video_maker && uv run python -m news_video_maker.fetcher.paper
+cd /c/Users/furag/Documents/prog/python/news_video_maker_en && uv run python -m news_video_maker.fetcher.paper
 ```
-完了後、`.cache/pipeline/{run_id}/01_papers.json` を読み込み、配列が空（`[]`）なら「新規論文なし」として後続ステージをスキップし、report.md に「新規論文なし: 処理済み論文のみのため終了」と記録して終了する。
+After completion, read `.cache/pipeline/{run_id}/01_papers.json`. If the array is empty (`[]`), skip subsequent stages and write "No new papers: only previously processed papers found" to report.md, then stop.
 
-（`PIPELINE_RUN_ID` 環境変数が設定済みのため、Python側が自動的に正しいディレクトリへ書き込む）
+(The `PIPELINE_RUN_ID` environment variable is already set; Python automatically writes to the correct directory.)
 
-### ステージ 2: 選定・日本語要約
+### Stage 2: Select and generate English summary
 
-`--from-stage` が 2 以下の場合、以下を実行:
+If `--from-stage` ≤ 2:
 
-**`--mode news` の場合**: `/process` コマンドと同じ手順を実行する:
+**`--mode news`**: run the same steps as the `/process` command:
 
-1. **過去採用タイトルを取得（ネタ被り防止）**:
-   - Bash で `.cache/pipeline/` 以下の全 `02_selected.json` を列挙する:
+1. **Get past titles (duplicate prevention)**:
+   - List all `02_selected.json` files in `.cache/pipeline/`:
      ```bash
      ls .cache/pipeline/*/02_selected.json 2>/dev/null
      ```
-   - 見つかったファイル（現在の `{run_id}` のものは除く）を Read ツールで読み込み、`title`（英語原題）と `japanese_title`（日本語タイトル）を収集し `past_titles` リストとして保持する
-   - ファイルが1件もない場合は `past_titles = []` とする
+   - Read the found files (excluding the current `{run_id}`) and collect `title` (English) and `english_title` as `past_titles`
+   - If no files found, set `past_titles = []`
 
-2. **記事をスコアリングして最良の1件を選定**:
-   - Read ツールで `.cache/pipeline/{run_id}/01_articles.json` を読み込む
-   - 各記事を 1〜10 点でスコアリング。以下の**視聴数パターン**に基づいて加点・減点する:
+2. **Score articles and select the best one**:
+   - Read `.cache/pipeline/{run_id}/01_articles.json`
+   - Score each article 1–10 using the following **viewership patterns**:
 
-   **加点要素（高視聴に繋がる傾向）:**
-   - 個人の体験・実話ストーリー形式（「〇〇した話」「〇〇になった」）: **+3点**
-   - お金・給与・報酬・賞金など金額が絡む内容: **+2点**
-   - 「自分ごと」として感じられる内容（自分の仕事・スマホ・使っているサービスに関係する）: **+2点**
-   - 業界ドラマ（著名人の辞任・抗議・対立・スキャンダル）: **+2点**
-   - 驚き・意外性・皮肉なオチがある（逆説的な展開）: **+1点**
+   **Positive factors (tend to drive higher views):**
+   - Personal experience / real story format: **+3 pts**
+   - Involves money, salary, reward, or prize: **+2 pts**
+   - Personally relevant (affects one's own job, phone, or daily services): **+2 pts**
+   - Industry drama (notable resignation, protest, conflict, scandal): **+2 pts**
+   - Has surprise, irony, or a paradoxical twist: **+1 pt**
 
-   **減点要素（低視聴に繋がる傾向）:**
-   - 抽象的・汎用的すぎるテーマ（「〇〇の常識が変わった」など）: **-2点**
-   - 特定地域・ニッチ企業のニュースで日本人視聴者に馴染みが薄い: **-2点**
-   - 製品レビュー・スペック紹介のみで人間ドラマがない: **-1点**
-   - `past_titles` に含まれる過去記事と主題・企業・技術が重複または類似する場合は **-10点** のペナルティ（ネタ被り防止）
+   **Negative factors (tend to drive lower views):**
+   - Too abstract or generic ("X changed everything"): **-2 pts**
+   - Regional or niche company news unfamiliar to a global English audience: **-2 pts**
+   - Pure product review / spec announcement with no human drama: **-1 pt**
+   - Topic, company, or technology overlaps with a `past_titles` entry: **-10 pts**
 
-   採点した結果、最高スコアの記事を選定する
+   Select the highest-scoring article.
 
-1. **日本語タイトル・要約・キーポイントを生成**
+3. **Generate English title, summary, and key points**
 
-2. **Write ツールで `.cache/pipeline/{run_id}/02_selected.json` に保存**
+4. **Save to `.cache/pipeline/{run_id}/02_selected.json`** with the Write tool
 
-**`--mode paper` の場合**: `/process-paper` コマンドと同じ手順を実行する:
+**`--mode paper`**: run the same steps as the `/process-paper` command:
 
-1. **過去採用タイトルを取得（ネタ被り防止）**:
-   - 上記 news モードと同様に `past_titles` を取得する
+1. **Get past titles (duplicate prevention)**: same as news mode above
 
-2. **論文をスコアリングして最良の1件を選定**:
-   - Read ツールで `.cache/pipeline/{run_id}/01_papers.json` を読み込む
-   - 各論文を 1〜10 点でスコアリング（HF 掲載 +2 点、技術的新規性・実用性・分かりやすさを考慮）
-   - `past_titles` との重複は **-3点** ペナルティ
-   - 最高スコアの論文を選定（同点は `hf_upvotes` 多い順 → 新しい順）
+2. **Score papers and select the best one**:
+   - Read `.cache/pipeline/{run_id}/01_papers.json`
+   - Score each paper 1–10 (HF listing +2 pts, technical novelty, practical usefulness, accessibility)
+   - Overlap with `past_titles`: **-3 pts** penalty
+   - Select highest-scoring paper (tie-break: most `hf_upvotes`, then newest)
 
-3. **日本語タイトル・要約・キーポイントを生成**
+3. **Generate English title, summary, and key points**
 
-4. **Write ツールで `.cache/pipeline/{run_id}/02_selected.json` に保存**
+4. **Save to `.cache/pipeline/{run_id}/02_selected.json`** with the Write tool
 
-### ステージ 3: 台本生成
+### Stage 3: Script generation
 
-`--from-stage` が 3 以下の場合、以下を実行:
-- Read ツールで `.cache/pipeline/{run_id}/02_selected.json` を読み込む
+If `--from-stage` ≤ 3:
+- Read `.cache/pipeline/{run_id}/02_selected.json`
 
-**`--mode news` の場合**: `/gen-script` コマンドと同じ手順で台本を生成する。
-**`--mode paper` の場合**: `/gen-script-paper` コマンドと同じ手順で台本を生成する（セクション構成が論文向けに最適化）。
+**`--mode news`**: generate the script following the same steps as `/gen-script`.
+**`--mode paper`**: generate the script following the same steps as `/gen-script-paper` (section structure optimized for papers).
 
-- Write ツールで `.cache/pipeline/{run_id}/03_script.json` に保存
+- Save to `.cache/pipeline/{run_id}/03_script.json` with the Write tool
 
-### ステージ 4: 動画生成
+### Stage 4: Video generation
 
-`--from-stage` が 4 以下の場合、以下を実行:
+If `--from-stage` ≤ 4:
 ```bash
-cd /c/Users/furag/Documents/prog/python/news_video_maker && uv run python -m news_video_maker.video.composer
+cd /c/Users/furag/Documents/prog/python/news_video_maker_en && uv run python -m news_video_maker.video.composer
 ```
-（`PIPELINE_RUN_ID` 環境変数が設定済みのため、Python側が自動的に正しいディレクトリから読み込む）
+(The `PIPELINE_RUN_ID` environment variable is already set; Python reads from the correct directory automatically.)
 
-### ステージ 4.5: 動画検証（技術チェック + フレーム抽出）
-ステージ 4 完了後に以下を実行:
+### Stage 4.5: Video validation (technical check + frame extraction)
+After stage 4 completes:
 ```bash
-cd /c/Users/furag/Documents/prog/python/news_video_maker && uv run python -m news_video_maker.video.validator
+cd /c/Users/furag/Documents/prog/python/news_video_maker_en && uv run python -m news_video_maker.video.validator
 ```
-- 終了コード 1 の場合（`ok: false`）: エラーを report.md に記録してパイプラインを停止する
-- 成功時: `.cache/pipeline/04_validation.json` と `.cache/pipeline/frames/` が生成される
+- If exit code is 1 (`ok: false`): record the error in report.md and stop the pipeline
+- On success: `.cache/pipeline/04_validation.json` and `.cache/pipeline/frames/` are created
 
-### ステージ 4.6: 動画検証（視覚チェック）
-`/validate-video` コマンドを実行して Claude Code にフレームを目視確認させる。
-- 視覚チェック NG の場合はエラー内容を report.md に記録してパイプラインを停止する
+### Stage 4.6: Video validation (visual check)
+Run the `/validate-video` command for Claude Code to visually inspect the frames.
+- If visual check fails, record the error in report.md and stop the pipeline
 
-### ステージ 5: YouTube 投稿
-`--dry-run` でない場合かつ `--from-stage` が 5 以下の場合、以下を順に実行:
+### Stage 5: YouTube upload
+If not `--dry-run` and `--from-stage` ≤ 5:
 
-1. **メタデータ生成**: `/gen-metadata` コマンドと同じ手順を実行し `.cache/pipeline/{run_id}/05_metadata.json` に保存
+1. **Generate metadata**: run the same steps as `/gen-metadata` and save to `.cache/pipeline/{run_id}/05_metadata.json`
 
-2. **YouTube アップロード（Python実行）**:
+2. **YouTube upload (Python)**:
 
-   `--publish-at` が指定されている場合:
+   If `--publish-at` is specified:
    ```bash
-   cd /c/Users/furag/Documents/prog/python/news_video_maker && uv run python -m news_video_maker.uploader.youtube --publish-at {publish_at}
+   cd /c/Users/furag/Documents/prog/python/news_video_maker_en && uv run python -m news_video_maker.uploader.youtube --publish-at {publish_at}
    ```
-   指定されていない場合:
+   Otherwise:
    ```bash
-   cd /c/Users/furag/Documents/prog/python/news_video_maker && uv run python -m news_video_maker.uploader.youtube
+   cd /c/Users/furag/Documents/prog/python/news_video_maker_en && uv run python -m news_video_maker.uploader.youtube
    ```
 
-## 完了後
+## After completion
 
-全ステージ完了後、Write ツールで `report.md` を以下の形式で生成:
+After all stages complete, generate `report.md` with the Write tool:
 
 ```markdown
-# 実行レポート: YYYY-MM-DD HH:MM
+# Pipeline Report: YYYY-MM-DD HH:MM
 
-## 実行ID
+## Run ID
 - run_id: {run_id}
 - mode: news / paper
 
-## 結果: 成功 / 失敗
+## Result: Success / Failure
 
-## 取得件数
-- 合計: X件（news: 記事数 / paper: 論文数）
+## Fetched count
+- Total: X items (news: article count / paper: paper count)
 
-## 選定コンテンツ
-- タイトル: ...
-- ソース: ...（news: techcrunch など / paper: arxiv）
-- スコア: ...
+## Selected content
+- Title: ...
+- English title: ...
+- Source: ... (news: techcrunch etc. / paper: arxiv)
+- Score: ...
 
-## 生成動画
-- パス: output/YYYYMMDD_HHMMSS.mp4
-- 尺: XX秒
+## Generated video
+- Path: output/YYYYMMDD_HHMMSS.mp4
+- Duration: XX sec
 
 ## YouTube
-- URL: https://youtu.be/xxxxx（--dry-run の場合は「スキップ」）
-- プライバシー: unlisted
+- URL: https://youtu.be/xxxxx (or "skipped" if --dry-run)
+- Privacy: unlisted
 
-## エラー（あれば）
+## Errors (if any)
 - ...
 ```
 
-## エラー処理
+## Error handling
 
-- 各ステージ失敗時はエラー内容を report.md に記録してパイプラインを停止する
-- `--from-stage` で失敗したステージから再実行可能
+- On stage failure, record the error in report.md and stop the pipeline
+- Use `--from-stage` to re-run from the failed stage

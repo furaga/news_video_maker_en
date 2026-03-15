@@ -2,7 +2,7 @@
 
 ## 目的
 
-処理済み記事から、30〜60秒の日本語ナレーション動画用の台本を生成する。処理は Claude Code（LLM）が担当する。
+Generate a 30–60 second English narration video script from a processed article. Handled by Claude Code (LLM).
 
 ## 対応コマンド
 
@@ -24,19 +24,19 @@ Claude Code（LLM処理）
 
 **ファイル**: `.cache/pipeline/03_script.json`
 
-**スキーマ**（`VideoScript`）:
+**Schema** (`VideoScript`):
 
 ```json
 {
-  "title": "動画タイトル（YouTubeに投稿するタイトル、60文字以内）",
+  "title": "Video title (YouTube upload title, 60 chars max)",
   "source_url": "https://...",
   "total_duration_sec": 45.0,
   "sections": [
     {
       "type": "hook",
-      "narration_text": "ナレーション本文（VOICEVOX で読み上げるテキスト）",
-      "subtitle_text": "画面に表示する字幕（短縮版）",
-      "estimated_duration_sec": 5.0
+      "narration_text": "English narration (also used as subtitle display text, with **keyword** markup)",
+      "subtitle_text": "Short key point for display (15 words max)",
+      "estimated_duration_sec": 4.0
     },
     {
       "type": "main_1",
@@ -108,24 +108,24 @@ class VideoScript:
 
 各セクションが切り替わるたびにカードアニメーションが発生するため、セクションを細かく分けることで画面に動きが生まれる。`02_selected.json` の `related_research` フィールドがある場合は `main_3` 以降で活用する。
 
-### 尺の推定
+### Duration estimation
 
-VOICEVOX の日本語読み上げ速度を基準に推定:
-- **標準速度**: 約 7〜8文字/秒
-- 例: 35秒 → 約 245〜280 文字
+Based on English natural speech rate (~130 wpm):
+- **Standard rate**: ~2.5 words/sec
+- Example: 35 sec → ~87 words
 
-### 台本の品質基準
+### Script quality standards
 
-- 自然な日本語の話し言葉（書き言葉ではなく）
-- 「〜です」「〜ます」調で統一
-- 専門用語は分かりやすく言い換え、または「〜と呼ばれる技術」などで補足
-- `narration_text` と `display_text` は原則として同じ内容でなければならない（英語キーワードをカタカナ読みに変換する以外の差異は禁止）
-- `subtitle_text` は後方互換のためフィールドとして残すが、字幕タイミング計算には使用しない（将来的に廃止予定）
+- Natural spoken English (contractions OK: "it's", "they've", "don't")
+- Short sentences, active voice
+- Spell out acronyms on first use where helpful (e.g., "large language model, or LLM")
+- `narration_text` is used as both the TTS input and the subtitle display text — `**keyword**` markup is included directly
+- `subtitle_text` keeps the key point from `narration_text` (15 words max)
 
-### YouTube タイトルの生成
+### YouTube title generation
 
-- `#テックニュース` `#ShortNews` などのハッシュタグを末尾に付ける
-- 60文字以内
+- 60 chars max
+- Hook-style, not descriptive
 
 ---
 

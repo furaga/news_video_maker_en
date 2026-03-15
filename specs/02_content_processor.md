@@ -2,7 +2,7 @@
 
 ## 目的
 
-フェッチした記事一覧から最も面白い記事を1件選定し、日本語で詳細要約する。処理は Claude Code（LLM）が担当する。
+Select the most interesting article from the fetched list and generate an English summary. Handled by Claude Code (LLM).
 
 ## 対応コマンド
 
@@ -24,30 +24,30 @@ Claude Code（LLM処理）
 
 **ファイル**: `.cache/pipeline/02_selected.json`
 
-**スキーマ**（`ProcessedArticle`）:
+**Schema** (`ProcessedArticle`):
 
 ```json
 {
-  "title": "元の英語タイトル",
+  "title": "Original English title",
   "url": "https://...",
   "source": "techcrunch",
-  "japanese_title": "日本語タイトル（40文字以内）",
-  "japanese_summary": "日本語の詳細要約（200〜300文字）",
+  "english_title": "Punchy English headline (60 chars max)",
+  "english_summary": "Detailed English summary (200–300 words)",
   "interest_score": 8.5,
   "key_points": [
-    "ポイント1（1文、40文字以内）",
-    "ポイント2（1文、40文字以内）",
-    "ポイント3（1文、40文字以内）"
+    "Point 1 (1 sentence, 15 words max)",
+    "Point 2",
+    "Point 3"
   ],
-  "related_research": "WebSearchで調査した関連情報・背景情報（200〜300文字）"
+  "related_research": "Related background information from WebSearch (200–300 words)"
 }
 ```
 
 ---
 
-## データモデル
+## Data model
 
-`src/news_video_maker/processor/` 以下のモデルとして定義（実装時に追加）:
+Defined as a model under `src/news_video_maker/processor/` (to be added on implementation):
 
 ```python
 from dataclasses import dataclass
@@ -57,11 +57,11 @@ class ProcessedArticle:
     title: str
     url: str
     source: str
-    japanese_title: str
-    japanese_summary: str
+    english_title: str
+    english_summary: str
     interest_score: float
     key_points: list[str]
-    related_research: str  # WebSearchで調査した関連情報
+    related_research: str  # Background information from WebSearch
 ```
 
 ---
@@ -72,38 +72,38 @@ class ProcessedArticle:
 
 `.cache/history.json` が存在する場合に Read ツールで読み込み、`entries` の `title` フィールドを最新 30 件取得する（新しい順）。ファイルがなければ空リストとして扱う。
 
-### ステップ1: 記事のスコアリング
+### Step 1: Score articles
 
-`01_articles.json` の全記事タイトルと要約（先頭 300 文字）を読み込み、Claude が以下の観点で 1〜10 でスコアを付ける:
+Load all article titles and summaries (first 300 chars) from `01_articles.json`. Claude scores each 1–10:
 
-**スコアリング観点（日本語テック読者向け）:**
-- 技術的に興味深いか（新技術・革新的手法など）
-- 日本のエンジニアに関係があるか
-- 日常的に使うツール・サービスに関する重要なアップデートか
-- センセーショナルすぎず、実質的な内容があるか
-- ステップ0で取得した過去タイトルと主題・企業・技術が重複または類似する場合は **-3点** のペナルティ（ネタ被り防止）
+**Scoring criteria (global English-speaking tech audience):**
+- Technically interesting (new technology, innovative approach, etc.)
+- Relevant to a global English-speaking tech audience
+- Important update to a tool or service engineers use daily
+- Substantive content, not purely sensational
+- Overlap with past titles from Step 0: **-3 pts** penalty
 
-### ステップ2: 最高スコアの記事を選定
+### Step 2: Select the highest-scoring article
 
-スコアが最も高い記事を1件選ぶ。同点の場合は新しい記事を優先。
+Pick the one with the highest score. Prefer newer articles on tie.
 
-### ステップ3: 日本語要約の生成
+### Step 3: Generate English summary
 
-選定した記事の `summary_text`（または `full_text` がある場合はその先頭 2000 文字）を元に:
+Using the selected article's `summary_text` (or first 2000 chars of `full_text` if available):
 
-1. **`japanese_title`**: 元タイトルを自然な日本語に意訳（40文字以内）
-2. **`japanese_summary`**: 記事の内容を日本語で詳しく要約（200〜300文字）
-   - 技術的な背景・意義を含める
-   - 専門用語はそのまま使い、必要に応じて括弧で英語表記を補足
-3. **`key_points`**: 動画スクリプトで使う3〜5個の箇条書きポイント（各40文字以内）
+1. **`english_title`**: rephrase the original title into a punchy English headline (60 chars max)
+2. **`english_summary`**: detailed English summary (200–300 words)
+   - Include technical background and significance
+   - Use technical terms as-is; clarify with brief parenthetical if needed
+3. **`key_points`**: 3–5 bullet points for the video script (each max 15 words)
 
-### ステップ4: 関連情報の調査
+### Step 4: Research related information
 
-`WebSearch` ツールを使い、選定記事のトピックに関連する情報を2〜3回検索する:
+Use the `WebSearch` tool to search 2–3 times for information related to the selected article:
 
-- 目的: 視聴者（日本のエンジニア）にとって有益な補足情報を提供し、単なる記事の読み上げではない深みのある動画にする
-- 検索例: 類似事例・比較技術・業界背景・専門家コメント・今後の動向など
-- 収集した情報を `related_research` フィールドに日本語でまとめる（200〜300文字）
+- Goal: provide supplementary depth beyond the article itself
+- Examples: similar cases, competing technologies, industry background, expert commentary, future outlook
+- Summarize the collected information in English in `related_research` (200–300 words)
 
 ---
 

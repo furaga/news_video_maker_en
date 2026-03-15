@@ -1,63 +1,62 @@
 # /process
 
-`.cache/pipeline/01_articles.json` の記事一覧から最も面白い記事を1件選定し、日本語要約して `.cache/pipeline/02_selected.json` に保存する。
+Select the most interesting article from `.cache/pipeline/01_articles.json` and save an English summary to `.cache/pipeline/02_selected.json`.
 
-## 手順
+## Steps
 
-1. Read ツールで `.cache/pipeline/01_articles.json` を読み込む
+1. Read `.cache/pipeline/01_articles.json`
 
-1a. 過去に採用した記事タイトルを取得してネタ被りを防ぐ:
-   - `.cache/history.json` が存在する場合、Read ツールで読み込む
-   - `entries` フィールドから `title` を最新30件抽出し、変数 `past_titles` として保持する
-   - ファイルが存在しない場合は `past_titles = []` とする
+1a. Load past article titles to prevent duplicate topics:
+   - If `.cache/history.json` exists, read it and extract the `title` field from the latest 30 `entries` as `past_titles`
+   - If the file does not exist, set `past_titles = []`
 
-2. 全記事をスコアリング（1〜10）:
-   - 技術的に興味深いか（新技術・革新的手法など）
-   - 日本のエンジニアに関係があるか
-   - 日常的に使うツール・サービスの重要なアップデートか
-   - 実質的な内容があるか（センセーショナルすぎない）
-   - 「えっ、マジで？」となる驚き・意外性があるか（有名企業の失敗、記録的な数字、劇的な逆転、スキャンダルなど）（+1〜2点）
-   - 非エンジニアでも「面白い」と感じるか（+1点）
-   - `past_titles` に含まれる過去記事と主題・企業・技術が重複または類似する場合は **-3点** のペナルティを与える（ネタ被り防止）
-   - 単なる機能追加・バージョンアップ発表で感情インパクトのない記事（-1点）
-   - 数字・固有名詞・具体的なエピソードが乏しい抽象的な記事（-1点）
+2. Score all articles (1–10):
+   - Technically interesting (new technology, innovative approach, etc.)
+   - Relevant to a global English-speaking tech audience
+   - Important update to a tool or service engineers use daily
+   - Substantive content (not purely sensational)
+   - Has a surprising or unexpected angle (famous company failures, record-breaking numbers, dramatic reversals, scandals) (+1–2 pts)
+   - Interesting even to non-engineers (+1 pt)
+   - **-3 pts** penalty if the topic, company, or technology overlaps with a title in `past_titles`
+   - Plain version/feature announcements with no emotional impact (-1 pt)
+   - Abstract articles lacking numbers, proper nouns, or concrete examples (-1 pt)
 
-3. 最高スコアの記事を1件選定（同点は新しい方を優先）
+3. Select the highest-scoring article (prefer newer on tie)
 
-4. 選定記事の `image_url` フィールドを `01_articles.json` からそのまま引き継ぐ
+4. Carry over the `image_url` field from `01_articles.json` unchanged
 
-5. 選定記事を日本語で処理:
-   - `japanese_title`: 元タイトルを自然な日本語に意訳（40文字以内）
-   - `japanese_summary`: 記事内容を日本語で詳しく要約（200〜300文字）
-   - `key_points`: 動画スクリプト用の箇条書き3〜5個（各40文字以内）
+5. Process the selected article in English:
+   - `english_title`: rephrase the original title into a punchy English headline (60 chars max)
+   - `english_summary`: detailed English summary of the article (200–300 words)
+   - `key_points`: 3–5 bullet points in English for the video script (each max 15 words)
 
-6. WebSearch ツールで関連情報を調査（2〜3回の検索）:
-   - 選定記事のトピックに関連する背景情報・関連技術を検索する
-   - 視聴者（日本のエンジニア）にとって有益な補足情報を収集する
-   - 例: 同トピックの類似事例、業界への影響、技術的な詳細、専門家の見解など
-   - 収集した情報を `related_research` フィールドにまとめる（200〜300文字）
+6. Research related information with the WebSearch tool (2–3 searches):
+   - Search for background information and related technology relevant to the article topic
+   - Collect supplementary information useful to a global tech audience
+   - Examples: similar cases, industry impact, technical details, expert opinions
+   - Summarize the collected information in the `related_research` field (200–300 words in English)
 
-7. Write ツールで `.cache/pipeline/02_selected.json` に以下のスキーマで保存:
+7. Save to `.cache/pipeline/02_selected.json` with the Write tool using the schema below:
 
 ```json
 {
-  "title": "元の英語タイトル",
+  "title": "Original English title",
   "url": "https://...",
   "source": "techcrunch",
-  "image_url": "https://... (01_articles.json の image_url をそのまま引き継ぐ。なければ空文字)",
-  "japanese_title": "日本語タイトル（40文字以内）",
-  "japanese_summary": "日本語の詳細要約（200〜300文字）",
+  "image_url": "https://... (copied from 01_articles.json; empty string if missing)",
+  "english_title": "Punchy English headline (60 chars max)",
+  "english_summary": "Detailed English summary (200–300 words)",
   "interest_score": 8.5,
   "key_points": [
-    "ポイント1（1文、40文字以内）",
-    "ポイント2（1文、40文字以内）",
-    "ポイント3（1文、40文字以内）"
+    "Point 1 (1 sentence, 15 words max)",
+    "Point 2",
+    "Point 3"
   ],
-  "related_research": "WebSearchで調査した関連情報・背景情報（200〜300文字）"
+  "related_research": "Related background information from WebSearch (200–300 words)"
 }
 ```
 
-## エラー処理
+## Error handling
 
-- `01_articles.json` が空の場合はエラーを表示して停止する
-- JSONが正しく生成できない場合は最大2回まで再試行する
+- If `01_articles.json` is empty, display an error and stop
+- If the JSON cannot be generated correctly, retry up to 2 times

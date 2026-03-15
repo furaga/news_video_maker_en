@@ -85,8 +85,8 @@ def _calc_chunk_durations(
 
 
 def _split_at_sentence_boundaries(text: str) -> list[str]:
-    """。！？ で分割し、区切り文字を末尾に残したチャンクを返す。"""
-    parts = re.split(r'(?<=[。！？])', text)
+    """Split at English sentence boundaries (.!?), keeping the delimiter."""
+    parts = re.split(r'(?<=[.!?])\s+', text)
     return [p for p in parts if p.strip()]
 
 
@@ -95,9 +95,9 @@ def _get_sentence_durations(
     total_duration: float,
     cache_dir: Path,
 ) -> list[float]:
-    """各文を VOICEVOX で個別合成して音声長を測定し、total_duration に正規化して返す。
+    """Synthesize each sentence individually to measure audio length, normalized to total_duration.
 
-    個別合成 WAV は cache_dir/sentences/ にキャッシュする。
+    Individual sentence MP3s are cached in cache_dir/sentences/.
     """
     if len(narration_sentences) <= 1:
         return [total_duration]
@@ -105,7 +105,7 @@ def _get_sentence_durations(
     sent_durations = []
     for i, sentence in enumerate(narration_sentences):
         key = hashlib.md5(sentence.encode()).hexdigest()[:8]
-        wav_path = cache_dir / "sentences" / f"{key}_{i}.wav"
+        wav_path = cache_dir / "sentences" / f"{key}_{i}.mp3"
         wav_path.parent.mkdir(parents=True, exist_ok=True)
         if not wav_path.exists():
             synthesize(sentence, wav_path)
@@ -121,8 +121,8 @@ def _get_sentence_durations(
 
 logger = logging.getLogger(__name__)
 
-# CTAナレーション
-CTA_NARRATION = "高評価とチャンネル登録、よろしくおねがいします！"
+# CTA narration
+CTA_NARRATION = "If you found this helpful, like and subscribe for daily AI news!"
 
 
 @dataclass
@@ -187,12 +187,12 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
     if selected_path.exists():
         selected = json.loads(selected_path.read_text(encoding="utf-8"))
         article_title_en = selected.get("title", selected.get("title_en", script.title))
-        key_points = selected.get("ja_key_points", [])
+        key_points = selected.get("key_points", [])
 
     # 全セクションの音声を先に合成して total_duration を確定
     # (スクリプトのセクション + CTAセクション)
     all_sections = list(script.sections)
-    cta_wav_path = AUDIO_DIR / f"{len(all_sections):02d}_cta.wav"
+    cta_wav_path = AUDIO_DIR / f"{len(all_sections):02d}_cta.mp3"
     synthesize(CTA_NARRATION, cta_wav_path)
     cta_audio = AudioFileClip(str(cta_wav_path))
     cta_duration = cta_audio.duration
@@ -202,7 +202,7 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
     durations = []
     for i, section in enumerate(all_sections):
         name = f"{i:02d}_{section.type}"
-        wav_path = AUDIO_DIR / f"{name}.wav"
+        wav_path = AUDIO_DIR / f"{name}.mp3"
         synthesize(section.narration_text, wav_path)
         audio = AudioFileClip(str(wav_path))
         wav_paths.append(wav_path)
@@ -325,7 +325,7 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
         fps=30,
         logger=None,
     )
-    logger.info("動画生成完了: %s", output_path)
+    logger.info("Video generated: %s", output_path)
     return output_path
 
 
@@ -341,22 +341,22 @@ def save_metadata(script: VideoScript, output_path: Path) -> Path:
         "video_path": str(output_path.resolve()),
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-    logger.info("メタデータ保存完了: %s", meta_path)
+    logger.info("Metadata saved: %s", meta_path)
 
-    # YouTube用マークダウンファイルも出力
+    # Markdown file for YouTube description
     md_path = output_path.with_suffix(".md")
     md_content = (
-        f"# タイトル\n"
+        f"# Title\n"
         f"{clean_title}\n"
         f"\n"
-        f"# 説明文\n"
-        f"この動画はAIを活用して海外テックニュースの情報収集・翻訳・編集を一部自動化して制作したものです。\n"
+        f"# Description\n"
+        f"This video uses AI to automate news research and video editing.\n"
         f"\n"
-        f"元記事: {script.source_url}\n"
-        f"#テックニュース #AI #セキュリティ\n"
+        f"Source: {script.source_url}\n"
+        f"#TechNews #AI #ShortNews\n"
     )
     md_path.write_text(md_content, encoding="utf-8")
-    logger.info("マークダウンメタデータ保存完了: %s", md_path)
+    logger.info("Markdown metadata saved: %s", md_path)
 
     return meta_path
 
@@ -366,7 +366,7 @@ def main():
 
     script_path = PIPELINE_DIR / "03_script.json"
     if not script_path.exists():
-        raise FileNotFoundError(f"台本ファイルが見つかりません: {script_path}")
+        raise FileNotFoundError(f"Script file not found: {script_path}")
 
     script = load_script(script_path)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -378,8 +378,8 @@ def main():
     # パスファイルに保存
     path_file = PIPELINE_DIR / "04_video_path.txt"
     path_file.write_text(str(output_path.resolve()), encoding="utf-8")
-    print(f"動画生成完了: {output_path}")
-    print(f"メタデータ保存: {meta_path}")
+    print(f"Video generated: {output_path}")
+    print(f"Metadata saved: {meta_path}")
 
 
 if __name__ == "__main__":

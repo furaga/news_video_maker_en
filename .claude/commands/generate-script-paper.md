@@ -1,88 +1,84 @@
 # /gen-script-paper
 
-`.cache/pipeline/02_selected.json` の処理済み論文から、30〜60秒の日本語ナレーション動画用の台本を生成して `.cache/pipeline/03_script.json` に保存する。
+Generate a 30–60 second English narration video script from the processed paper in `.cache/pipeline/02_selected.json` and save it to `.cache/pipeline/03_script.json`.
 
-## 手順
+## Steps
 
-1. Read ツールで `.cache/pipeline/02_selected.json` を読み込む
+1. Read `.cache/pipeline/02_selected.json`
 
-2. 以下の構成で台本を生成:
+2. Generate a script with the following structure:
 
-   | セクション | 目的 | 目標尺 |
+   | Section | Purpose | Target duration |
    |---|---|---|
-   | `hook` | 視聴者が次を見たくなる掴み（下記テクニック必須） | 3〜4秒（約20〜30文字） |
-   | `main_1` | 研究の問い・既存の問題点（なぜこの研究が必要か） | 7〜10秒（約50〜80文字） |
-   | `main_2` | 提案手法（何をどう解決したか、アイデアの核心） | 7〜10秒（約50〜80文字） |
-   | `main_3` | 実験結果・性能向上の数値（従来比〇〇倍など） | 7〜10秒（約50〜80文字） |
-   | `main_4` | 実用面のインパクト・今後の展望（任意） | 7〜10秒（約50〜80文字） |
-   | `outro` | まとめ | 4〜5秒（約30〜40文字） |
+   | `hook` | Grab attention — viewer must want to keep watching (required techniques below) | 3–4 sec (~8–12 words) |
+   | `main_1` | Research question and existing problem (why this research matters) | 7–10 sec (~18–25 words) |
+   | `main_2` | Proposed method (what they did and how — the core idea) | 7–10 sec (~18–25 words) |
+   | `main_3` | Experimental results and performance numbers (e.g., "27× faster than prior work") | 7–10 sec (~18–25 words) |
+   | `main_4` | Practical impact and future outlook (optional) | 7–10 sec (~18–25 words) |
+   | `outro` | Wrap-up (do NOT include a subscribe call-to-action — the CTA section adds that automatically) | 4–5 sec (~10–13 words) |
 
-   **重要**:
-   - セクションを細かく分けることで、各セクション切り替え時にカードアニメーションが発生し、画面に動きが生まれる。
-   - `02_selected.json` に `related_research` フィールドがあれば、その情報を `main_3` や `main_4` に積極的に活用すること。
-   - `outro` には「チャンネル登録」を含めないこと（動画終端のCTAセクションで自動追加される）。
+   **Important**:
+   - Multiple sections create card-switch animations that keep the video visually dynamic.
+   - If `related_research` exists in `02_selected.json`, actively use it in `main_3` or `main_4`.
 
-### hook テクニック（必須）
+### Hook techniques (required)
 
-hook の `narration_text` は以下の4パターンのいずれかで書くこと。**「〇〇が提案されました」のような平叙文は禁止。**
+The hook `narration_text` must follow one of these 4 patterns. **Plain declarative sentences like "Researchers proposed a new method" are forbidden.**
 
-| パターン | 特徴 | 例 |
+| Pattern | Characteristic | English example |
 |---|---|---|
-| **数字型** | 具体的な数値改善で規模を即伝える | 「ジーピーユーたった2枚で、エーアイ世界ランキング1位をとってしまいました。」 |
-| **ひっくり返し型** | 常識を覆す結果を1文で完結させる | 「モデルの重みを一切変えずに、性能を17パーセント以上あげることができました。」 |
-| **緊迫感型** | 既存手法の限界を強調して問題意識を煽る | 「いまのエーアイには、〇〇という致命的な弱点があります。」 |
-| **ループ型** | 最も驚くべき結果を冒頭に置き、疑問で締める | 「ジーピーユー2枚で世界1位をとった個人開発者がいます。その方法とは。」 |
+| **Numbers** | Lead with a concrete improvement metric | "With just 2 GPUs, one researcher took the top spot on the global AI leaderboard." |
+| **Reversal** | Wrap up a counterintuitive result in one sentence | "They improved model accuracy by 17% — without changing a single weight." |
+| **Urgency** | Highlight a critical limitation of current methods | "Today's AI has a fatal blind spot that nobody's been able to fix — until now." |
+| **Loop** | Open with the most surprising result, close with a question | "A solo developer beat every major lab with $200 in compute. Here's the trick." |
 
-**カリオシティーギャップ（好奇心の隙間）:** hook の最終文は、視聴者が「で、どうやって？」「なぜ？」と感じる形で終わらせる。以下のパターンから選ぶ:
-- 疑問提示型: 「その方法とは。」「一体どんな仕組みなのか。」
-- 逆説提示型: 「しかし、そのアイデアは全く常識外でした。」
-- 規模強調型: 「一番驚くのはここからです。」
+**Curiosity gap:** End the hook with a sentence that makes the viewer think "How?" or "Why?":
+- Question: "So how did they pull it off?"
+- Paradox: "And the approach is completely unlike anything tried before."
+- Scale: "And the most surprising part is still ahead."
 
-（※「詳細はこのあと」「続きはこのあと」のような表現はショート動画に合わないため禁止）
+(Phrases like "More details coming up" do not fit short-form video — forbidden.)
 
-### セクション間ブリッジ（推奨）
+### Section bridges (recommended)
 
-`main_1` ～ `main_3` の `narration_text` 末尾に、次セクションへの引きとなる1文を加える。
+Add a bridge sentence at the end of `main_1` through `main_3`:
 
-- 例: 「では、その手法の核心とは何か。」
-- 例: 「しかし、一番驚くのはここからです。」
-- 例: 「実際の性能向上はどれほどだったのか、数字で見てみましょう。」
+- "So what exactly is the core idea behind this?"
+- "And the most surprising part is still ahead."
+- "Let's look at the actual numbers."
 
-3. 文字数から尺を推定（約7〜8文字/秒）し、合計が25〜60秒に収まるよう調整する
-   - 60秒超 → 各 `main_*` セクションを短縮して再生成（1回まで）
-   - 25秒未満 → 各 `main_*` セクションに情報を補足して再生成（1回まで）
+3. Estimate duration from word count (~2.5 words/sec, ~130 wpm English natural speech) and adjust to total 25–60 seconds:
+   - Over 60 sec → shorten each `main_*` section and regenerate (once)
+   - Under 25 sec → add more detail to each `main_*` section and regenerate (once)
 
-4. Write ツールで `.cache/pipeline/03_script.json` に以下のスキーマで保存（**すべてのフィールドは必須。特に `image_url`、`bg_prompt`、`display_text`、`annotations` を忘れないこと**）:
+4. Save to `.cache/pipeline/03_script.json` with the Write tool (**all fields are required; do not omit `image_url`, `bg_prompt`, or `annotations`**):
 
 ```json
 {
-  "title": "動画タイトル本文（30文字以内）",
+  "title": "Video title (60 chars max, **keyword** markup OK)",
   "source_url": "https://arxiv.org/abs/...",
   "image_url": "",
   "total_duration_sec": 45.0,
   "sections": [
     {
       "type": "hook",
-      "narration_text": "VOICEVOX で読み上げるナレーション本文（カタカナ読み・ひらがな誤読防止）",
-      "display_text": "画面字幕表示用（原語表記 + **キーワード** マークアップ）",
-      "subtitle_text": "要点のみ（25文字以内）",
-      "bg_prompt": "具体的な物体・場所を英語で記述したSD用プロンプト（下記ガイドライン参照）",
+      "narration_text": "English narration with **keyword** markup for visual highlighting",
+      "subtitle_text": "Key point only (15 words max)",
+      "bg_prompt": "Stable Diffusion prompt in English (see guidelines below)",
       "annotations": {},
-      "estimated_duration_sec": 5.0
+      "estimated_duration_sec": 4.0
     },
     {
       "type": "main_1",
       "narration_text": "...",
-      "display_text": "...",
       "subtitle_text": "...",
       "bg_prompt": "...",
-      "annotations": {"LLM": "大規模言語モデル"},
+      "annotations": {"LLM": "large language model"},
       "estimated_duration_sec": 9.0
     },
     {
       "type": "main_2",
       "narration_text": "...",
-      "display_text": "...",
       "subtitle_text": "...",
       "bg_prompt": "...",
       "annotations": {},
@@ -91,7 +87,6 @@ hook の `narration_text` は以下の4パターンのいずれかで書くこ�
     {
       "type": "main_3",
       "narration_text": "...",
-      "display_text": "...",
       "subtitle_text": "...",
       "bg_prompt": "...",
       "annotations": {},
@@ -99,8 +94,7 @@ hook の `narration_text` は以下の4パターンのいずれかで書くこ�
     },
     {
       "type": "outro",
-      "narration_text": "まとめのナレーション（「チャンネル登録」は含めない）",
-      "display_text": "...",
+      "narration_text": "Closing narration (no subscribe call-to-action)",
       "subtitle_text": "...",
       "bg_prompt": "...",
       "annotations": {},
@@ -110,73 +104,56 @@ hook の `narration_text` は以下の4パターンのいずれかで書くこ�
 }
 ```
 
-### annotations ガイドライン
+### annotations guidelines
 
-各セクションの `annotations` に、字幕中の専門用語・略称・固有名詞の簡潔な説明を記述する。
+Add brief English explanations for technical terms and acronyms in `annotations`.
 
-**ルール:**
-- キーは `display_text` 内の `**keyword**` マークアップで囲まれた用語と一致させる
-- 値は日本語で簡潔な説明（10文字以内目安）
-- 略称の正式名称や、一般視聴者が知らない可能性がある専門用語のみ対象
-- 一般的に知られている用語（AI、Google、YouTube など）や一般的な日本語には不要
-- 同じ用語が複数セクションに出る場合、初出セクションのみに付ける（2回目以降は空の `{}` でよい）
+**Rules:**
+- Key must match a term wrapped in `**keyword**` markup in `narration_text`
+- Value is a short English description (aim for 5 words or fewer)
+- Only for acronyms and technical jargon a general viewer may not know
+- Not needed for widely known terms (AI, Google, GPU, etc.)
+- For repeated terms, only annotate on first occurrence (use `{}` for subsequent sections)
 
-### bg_prompt ガイドライン
+### bg_prompt guidelines
 
-各セクションの `bg_prompt` に、そのセリフの内容を視覚的に表現する **Stable Diffusion 向け英語プロンプト** を生成する。
+Generate a **Stable Diffusion prompt in English** that visually represents the section's content.
 
-**ルール:**
-- 具体的な物体・場所・人工物を英語で記述する（例: `glowing neural network visualization, multiple layers of nodes, blue light`）
-- 照明・アングルを指定する（例: `soft ambient lighting, close-up, eye-level shot`）
-- 末尾に必ず `photorealistic, 8k, cinematic, no text, no people` を追加する
-- 抽象的な概念は視覚的なオブジェクトに変換する:
-  - 「推論高速化」→ `fast flowing data streams, server rack with glowing blue lights`
-  - 「精度向上」→ `target with bullseye, precision instruments, measurement tools`
-  - 「学習・訓練」→ `computer screen showing training curves, neural network diagram`
-  - 「ロボット制御」→ `robotic arm on laboratory table, mechanical joints, sensors`
-  - 「自然言語処理」→ `text floating in digital space, word clouds, code on screen`
-- 日本語キーワードをそのまま入れない（SD は日本語が苦手）
+**Rules:**
+- Describe concrete objects, places, and artifacts in English
+- Specify lighting and angle
+- Always append `photorealistic, 8k, cinematic, no text, no people`
+- Convert abstract concepts to visual objects:
+  - "faster inference" → `fast flowing data streams, server rack with glowing blue lights`
+  - "improved accuracy" → `target with bullseye, precision instruments, measurement tools`
+  - "training / learning" → `computer screen showing training curves, neural network diagram`
+  - "robot control" → `robotic arm on laboratory table, mechanical joints, sensors`
+  - "natural language processing" → `text floating in digital space, word clouds, code on screen`
 
-## タイトル生成ガイドライン
+## Title guidelines
 
-YouTubeショートで伸びやすい論文向けフック型タイトルを生成すること。
+Generate a hook-style title optimized for YouTube Shorts papers content.
 
-**フォーマット例（30文字以内の本文）:**
-- `「**LLM**の推論が27倍速くなる」` → 数値インパクト
-- `「**画像生成**の精度がついに人間超え」` → 達成感
-- `「**ロボット**が道具を自分で作れるように」` → 驚き・意外性
-- `「**強化学習**なしで自律飛行を実現」` → 手法の革新性
-- `「エンジニア必見！**拡散モデル**の新手法」` → ターゲット訴求
+**Format examples (60 chars max):**
+- `**LLM** Inference Just Got 27× Faster` — numerical impact
+- `**Image Generation** Finally Beats Human Quality` — achievement
+- `**Robots** Can Now Build Their Own Tools` — surprise
+- `**RL-Free** Autonomous Flight Is Here` — method innovation
 
-**避けるべきタイトル:**
-- 論文タイトルの直訳（難解・長い）
-- 説明的すぎるタイトル（「〇〇チームが〇〇という手法を提案しました」）
-- **30文字超えるタイトル本文**
+**Avoid:**
+- Direct translations of the paper title (too technical, too long)
+- Descriptive titles ("Team X proposes a new method for Y")
+- Titles over 60 characters
 
-**タイトルのキーワードマークアップ:**
-- `title` フィールドにも `**keyword**` マークアップで強調したい単語を1〜2個指定する
-- 技術分野名・手法名など動画の核心となる用語を優先する
-- `**...**` マークアップは動画の画面上タイトル表示（黄色強調）専用。YouTubeへのアップロード時は自動的に除去される。
+**Title keyword markup:**
+- Use `**keyword**` in the `title` field to highlight 1–2 words (shown in yellow on screen)
+- Prioritize the core technical area or method name
+- The `**...**` markup is for on-screen display only — stripped automatically on YouTube upload
 
-## 品質基準
+## Quality standards
 
-- 自然な日本語の話し言葉（「〜です」「〜ます」調）
-- 専門用語は分かりやすく言い換えるか括弧で補足
-- `subtitle_text` は `narration_text` の要点のみ（25文字以内目安）
-- `narration_text` に含まれるアルファベット・固有名詞は例外なくカタカナ読みで記述する
-  （例: API → エーピーアイ、LLM → エルエルエム、GPU → ジーピーユー、
-       Transformer → トランスフォーマー、arXiv → アーカイブ、
-       RLHF → アールエルエイチエフ、LoRA → ローラ）
-- VOICEVOXがアルファベットを正しく読めるか保証できないため、原則すべてカタカナ変換する
-- `narration_text` では、VOICEVOXが誤読しやすい漢字はひらがなで記述する
-
-### display_text ガイドライン
-
-`display_text` は画面上の字幕として表示されるテキスト。以下のルールで生成する:
-
-- `narration_text` と同じ意味・構成だが、カタカナ読みを元の表記に戻す
-  （例: トランスフォーマー → Transformer、アーカイブ → arXiv、ローラ → LoRA）
-- 視聴者に強調したいキーワード（技術名・数値・驚きのポイント）を `**keyword**` でマークアップする
-- 1セクション内の `**keyword**` は2〜3個以内にとどめる（強調しすぎない）
-- 漢字の読み仮名（ひらがな化）は不要（表示用なので読みやすい漢字でよい）
-- `narration_text` との文字数差は ±20% 以内に収める（尺の推定に影響するため）
+- Natural spoken English (contractions are fine: "it's", "they've", "don't")
+- Short sentences, active voice
+- Spell out acronyms on first use where helpful (e.g., "large language model, or LLM")
+- `subtitle_text` is the key point from `narration_text` only (15 words max)
+- `narration_text` serves as both the TTS input and the subtitle display text — include `**keyword**` markup directly in it
