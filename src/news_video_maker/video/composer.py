@@ -284,7 +284,7 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
                 chunks.extend(sub_chunks)
                 chunk_durs.extend(sub_durs)
         else:
-            chunks = split_into_subtitle_chunks(section.narration_text)
+            chunks = _split_display_text(section.narration_text)
             chunk_durs = _calc_chunk_durations(chunks, duration)
 
         audio = AudioFileClip(str(wav_path))
