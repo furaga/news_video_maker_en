@@ -1,4 +1,5 @@
 """moviepy 動画合成"""
+
 import base64
 import hashlib
 import json
@@ -25,60 +26,60 @@ from news_video_maker.video.visuals import (
 def _split_display_text(display_text: str, max_chars: int = 26) -> list[str]:
     """**keyword** マークアップを保持しながら字幕チャンク分割する。
 
-    マークアップなし版でチャンク位置を決め、対応するマークアップ付きテキストを抽出する。
+    **keyword** マークアップ（複数単語を含む）は分割せず原子的トークンとして扱い、
+    単語境界でチャンク分割する。
     """
-    clean = re.sub(r'\*\*(.+?)\*\*', r'\1', display_text)
-    clean_chunks = split_into_subtitle_chunks(clean, max_chars)
+    # Step 1: Tokenize into word tokens, treating **keyword** as atomic even with internal spaces.
+    word_tokens: list[tuple[int, str]] = []  # (clean_char_count, display_str)
+    i = 0
+    while i < len(display_text):
+        if display_text[i] == " ":
+            i += 1
+            continue
+        m = re.match(r"\*\*(.+?)\*\*", display_text[i:])
+        if m:
+            word_tokens.append((len(m.group(1)), m.group(0)))
+            i += len(m.group(0))
+        else:
+            j = i
+            while (
+                j < len(display_text)
+                and display_text[j] != " "
+                and not display_text[j:].startswith("**")
+            ):
+                j += 1
+            word = display_text[i:j]
+            if word:
+                word_tokens.append((len(word), word))
+            i = j
 
-    result = []
-    orig_pos = 0
+    # Step 2: Greedily group tokens into chunks of at most max_chars.
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
 
-    for chunk in clean_chunks:
-        markup_chunk = ""
-        consumed = 0
-        i = orig_pos
+    for tok_len, tok_disp in word_tokens:
+        if current and current_len + 1 + tok_len > max_chars:
+            chunks.append(" ".join(current))
+            current = [tok_disp]
+            current_len = tok_len
+        else:
+            current_len += (1 if current else 0) + tok_len
+            current.append(tok_disp)
 
-        while consumed < len(chunk) and i < len(display_text):
-            m = re.match(r'\*\*(.+?)\*\*', display_text[i:])
-            if m:
-                kw = m.group(1)
-                if consumed + len(kw) <= len(chunk):
-                    markup_chunk += m.group(0)
-                    consumed += len(kw)
-                    i += len(m.group(0))
-                else:
-                    # キーワードがチャンク境界をまたぐ → 単語の途中で切らないよう次チャンクへ持ち越す
-                    if markup_chunk:
-                        break  # 現チャンクを確定し、キーワードは次チャンクの先頭から処理
-                    else:
-                        # チャンク先頭でもキーワードが長すぎる → 丸ごと含める
-                        markup_chunk += m.group(0)
-                        consumed += len(kw)
-                        i += len(m.group(0))
-            else:
-                markup_chunk += display_text[i]
-                consumed += 1
-                i += 1
+    if current:
+        chunks.append(" ".join(current))
 
-        result.append(markup_chunk)
-        orig_pos = i
-
-    # 残りがあれば追加
-    if orig_pos < len(display_text) and display_text[orig_pos:].strip():
-        result.append(display_text[orig_pos:].strip())
-
-    return result if result else [display_text]
+    return chunks if chunks else [display_text]
 
 
-def _calc_chunk_durations(
-    chunks: list[str], total_duration: float
-) -> list[float]:
+def _calc_chunk_durations(chunks: list[str], total_duration: float) -> list[float]:
     """文字数比で各チャンクの表示時間を配分する（マークアップ除外）。
 
     同一文内のサブチャンク按分に使用する。
     文をまたいだタイミングは _get_sentence_durations で VOICEVOX 実測値を使うこと。
     """
-    clean_lens = [len(re.sub(r'\*\*(.+?)\*\*', r'\1', c)) for c in chunks]
+    clean_lens = [len(re.sub(r"\*\*(.+?)\*\*", r"\1", c)) for c in chunks]
     total_chars = sum(clean_lens)
     if total_chars == 0:
         return [total_duration / len(chunks)] * len(chunks)
@@ -90,7 +91,7 @@ def _calc_chunk_durations(
 
 def _split_at_sentence_boundaries(text: str) -> list[str]:
     """Split at English sentence boundaries (.!?), keeping the delimiter."""
-    parts = re.split(r'(?<=[.!?])\s+', text)
+    parts = re.split(r"(?<=[.!?])\s+", text)
     return [p for p in parts if p.strip()]
 
 
@@ -123,6 +124,7 @@ def _get_sentence_durations(
 
     return [d / total_sent * total_duration for d in sent_durations]
 
+
 logger = logging.getLogger(__name__)
 
 # CTA narration
@@ -136,7 +138,9 @@ class ScriptSection:
     subtitle_text: str
     estimated_duration_sec: float
     bg_prompt: str = field(default="")
-    display_text: str = field(default="")  # 字幕表示用（**keyword** マークアップ、原語表記）
+    display_text: str = field(
+        default=""
+    )  # 字幕表示用（**keyword** マークアップ、原語表記）
     annotations: dict[str, str] = field(default_factory=dict)
 
 
@@ -224,7 +228,10 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
     if script.image_url:
         hook_bg_data_url = image_to_data_url(script.image_url) or ""
     if not hook_bg_data_url:
-        logger.info("hookセクション用: 記事URLからスクリーンショットを取得: %s", script.source_url)
+        logger.info(
+            "hookセクション用: 記事URLからスクリーンショットを取得: %s",
+            script.source_url,
+        )
         hook_bg_data_url = screenshot_article_url(script.source_url) or ""
 
     # セクションごとの bg_prompt を収集（存在する場合）
@@ -274,12 +281,16 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
             if len(display_sentences) != len(narration_sentences):
                 logger.warning(
                     "display_textとnarration_textの文数が一致しません (%d vs %d): %s",
-                    len(display_sentences), len(narration_sentences), section.type,
+                    len(display_sentences),
+                    len(narration_sentences),
+                    section.type,
                 )
                 display_sentences = [section.display_text]
                 sentence_durs = [duration]
             else:
-                sentence_durs = _get_sentence_durations(narration_sentences, duration, AUDIO_DIR)
+                sentence_durs = _get_sentence_durations(
+                    narration_sentences, duration, AUDIO_DIR
+                )
             chunks = []
             chunk_durs = []
             for display_sent, sent_dur in zip(display_sentences, sentence_durs):
@@ -336,7 +347,7 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
 def save_metadata(script: VideoScript, output_path: Path) -> Path:
     """動画と同名の .json メタデータファイルを output/ に保存する"""
     # YouTube用タイトルから **keyword** マークアップを除去
-    clean_title = re.sub(r'\*\*(.+?)\*\*', r'\1', script.title)
+    clean_title = re.sub(r"\*\*(.+?)\*\*", r"\1", script.title)
     meta_path = output_path.with_suffix(".json")
     meta = {
         "title": clean_title,
@@ -344,7 +355,9 @@ def save_metadata(script: VideoScript, output_path: Path) -> Path:
         "image_url": script.image_url,
         "video_path": str(output_path.resolve()),
     }
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    meta_path.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     logger.info("Metadata saved: %s", meta_path)
 
     # Markdown file for YouTube description
