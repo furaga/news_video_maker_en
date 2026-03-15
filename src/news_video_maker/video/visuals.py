@@ -22,13 +22,13 @@ _SUBTITLE_TEMPLATE = """\
 <html>
 <head>
 <meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{
     width: {width}px; height: {height}px;
     background: #0d1117;
-    font-family: 'M PLUS 1p', 'BIZ UDGothic', 'Noto Sans JP', 'Meiryo', 'Yu Gothic', sans-serif;
+    font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     overflow: hidden; position: relative;
   }}
   .bg {{
@@ -50,8 +50,8 @@ _SUBTITLE_TEMPLATE = """\
     font-size: 80px; font-weight: 900;
     color: #FFFFFF;
     line-height: 1.25;
-    word-break: break-all;
-    letter-spacing: -1px;
+    word-break: break-word;
+    letter-spacing: 0;
   }}
   .title-text .kw {{
     color: #FFE000;
@@ -73,7 +73,7 @@ _SUBTITLE_TEMPLATE = """\
     padding: 6px 14px;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
-    letter-spacing: -1px;
+    letter-spacing: 0;
   }}
   .subtitle-line .kw {{
     background: #FFE000;
@@ -108,13 +108,13 @@ _CTA_TEMPLATE = """\
 <html>
 <head>
 <meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{
     width: {width}px; height: {height}px;
     background: #0d1117;
-    font-family: 'M PLUS 1p', 'BIZ UDGothic', 'Noto Sans JP', 'Meiryo', 'Yu Gothic', sans-serif;
+    font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     overflow: hidden; position: relative;
   }}
   .bg {{
@@ -144,7 +144,7 @@ _CTA_TEMPLATE = """\
     padding: 6px 20px;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
-    letter-spacing: -1px;
+    letter-spacing: 0;
   }}
 </style>
 </head>
@@ -153,7 +153,7 @@ _CTA_TEMPLATE = """\
   <div class="cta-center">
     <div class="cta-emoji">👍🔔</div>
     <div style="text-align: center;">
-      <span class="cta-line">高評価とチャンネル登録<br>よろしくお願いします！</span>
+      <span class="cta-line">Like &amp; Subscribe<br>for Daily AI News!</span>
     </div>
   </div>
 </body>
@@ -192,122 +192,38 @@ def _chunk_to_html(chunk: str, annotations: dict[str, str] | None = None) -> str
     return result
 
 
-# 助詞（チャンク先頭に来ると不自然な語）
-_PARTICLES = set("はがをにでともへのやか")
-_PARTICLE_MULTI = {"から", "まで", "より", "など", "って", "では", "には", "とは", "ので", "のに", "けど"}
-_MIN_CHUNK_CHARS = 10
+def split_into_subtitle_chunks(text: str, max_chars: int = 40) -> list[str]:
+    """Split English narration text into subtitle display chunks.
 
-
-def _postprocess_chunks(chunks: list[str]) -> list[str]:
-    """助詞で始まるチャンク・短いチャンクを前のチャンクにマージする。"""
-    if len(chunks) <= 1:
-        return chunks
-
-    result: list[str] = []
-    for chunk in chunks:
-        if not result:
-            result.append(chunk)
-            continue
-        stripped = chunk.lstrip()
-        starts_with_particle = stripped and (
-            stripped[0] in _PARTICLES
-            or any(stripped.startswith(p) for p in _PARTICLE_MULTI)
-        )
-        if starts_with_particle or (stripped and len(stripped) < _MIN_CHUNK_CHARS):
-            result[-1] += chunk
-        else:
-            result.append(chunk)
-
-    return result
-
-
-def _split_chunks_ginza(text: str, max_chars: int = 26) -> list[str]:
-    """ginza（spaCy日本語モデル）でトークン化し、トークン単位でチャンク分割する。
-
-    token.idx を使って元テキストからスライスし、空白を正確に保持する。
+    Splits at sentence boundaries (.!?) first, then at word boundaries
+    within sentences to respect max_chars per chunk.
     """
-    import spacy
-    nlp = spacy.load("ja_ginza")
-    text = text.strip()
-    doc = nlp(text)
-
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
     chunks: list[str] = []
-    chunk_start = 0
-
-    for token in doc:
-        is_punct = token.text in "。！？、"
-        token_end = token.idx + len(token.text)
-
-        # このトークンを含めると max_chars を超える場合、手前で切る
-        if token_end - chunk_start > max_chars and token.idx > chunk_start:
-            chunks.append(text[chunk_start:token.idx])
-            chunk_start = token.idx
-
-        # 句読点で区切る（自然な区切り点）
-        if is_punct:
-            chunks.append(text[chunk_start:token_end])
-            chunk_start = token_end
-
-    # 残りのテキスト
-    if chunk_start < len(text):
-        chunks.append(text[chunk_start:])
-
-    chunks = _postprocess_chunks(chunks)
-    return [c for c in chunks if c.strip()] or [text]
-
-
-def _split_chunks_fallback(text: str, max_chars: int = 26) -> list[str]:
-    """フォールバック: 正規表現ベースの分割ロジック。"""
-    raw = re.split(r'(?<=[。！？])', text.strip())
-    raw = [s.strip() for s in raw if s.strip()]
-
-    chunks = []
-    for sentence in raw:
-        if len(sentence) <= max_chars:
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        clean = re.sub(r'\*\*(.+?)\*\*', r'\1', sentence)
+        if len(clean) <= max_chars:
             chunks.append(sentence)
             continue
-        parts = re.split(r'(?<=、)', sentence)
-        current = ""
-        for part in parts:
-            if len(current) + len(part) <= max_chars:
-                current += part
+        words = sentence.split()
+        current_words: list[str] = []
+        current_len = 0
+        for word in words:
+            clean_word = re.sub(r'\*\*(.+?)\*\*', r'\1', word)
+            word_len = len(clean_word)
+            if current_len + word_len + (1 if current_words else 0) > max_chars and current_words:
+                chunks.append(" ".join(current_words))
+                current_words = [word]
+                current_len = word_len
             else:
-                if current:
-                    chunks.append(current)
-                sub_parts = re.split(r'(?<=[てで])(?=[^\s、。！？])', part)
-                sub_current = ""
-                for sp in sub_parts:
-                    if len(sub_current) + len(sp) <= max_chars:
-                        sub_current += sp
-                    else:
-                        if sub_current:
-                            chunks.append(sub_current)
-                        while len(sp) > max_chars:
-                            chunks.append(sp[:max_chars])
-                            sp = sp[max_chars:]
-                        sub_current = sp
-                if sub_current:
-                    current = sub_current
-                else:
-                    current = ""
-        if current:
-            chunks.append(current)
-
-    chunks = _postprocess_chunks(chunks)
+                current_len += word_len + (1 if current_words else 0)
+                current_words.append(word)
+        if current_words:
+            chunks.append(" ".join(current_words))
     return chunks if chunks else [text]
-
-
-def split_into_subtitle_chunks(text: str, max_chars: int = 26) -> list[str]:
-    """narration_text を字幕チャンクのリストに分割する（形態素解析ベース）。
-
-    ginza でトークン化し、トークン単位で積み上げてチャンク分割する。
-    句読点（。！？、）は自然な区切り点として優先的に使用。
-    """
-    try:
-        return _split_chunks_ginza(text, max_chars)
-    except Exception:
-        logger.warning("ginza が利用できません。フォールバックの分割を使用します。")
-        return _split_chunks_fallback(text, max_chars)
 
 
 def image_to_data_url(image_url: str) -> str | None:
@@ -512,10 +428,9 @@ def generate_cta_clip(
         width=WIDTH,
         height=HEIGHT,
         bg_data_url=bg_data_url or "",
-        cta_text=html_module.escape("高評価とチャンネル登録\nよろしくお願いします！"),
     )
 
-    chunks = ["高評価とチャンネル登録\nよろしくお願いします！"]
+    chunks = ["Like & Subscribe\nfor Daily AI News!"]
     durations = [duration]
 
     logger.info("CTAクリップレンダリング開始: %.1fs", duration)

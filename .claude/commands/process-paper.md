@@ -1,57 +1,56 @@
 # /process-paper
 
-`.cache/pipeline/01_papers.json` の論文一覧から最も面白い論文を1件選定し、日本語要約して `.cache/pipeline/02_selected.json` に保存する。
+Select the most interesting paper from `.cache/pipeline/01_papers.json` and save an English summary to `.cache/pipeline/02_selected.json`.
 
-## 手順
+## Steps
 
-1. Read ツールで `.cache/pipeline/01_papers.json` を読み込む
+1. Read `.cache/pipeline/01_papers.json`
 
-1a. 過去に採用した記事・論文タイトルを取得してネタ被りを防ぐ:
-   - `.cache/history.json` が存在する場合、Read ツールで読み込む
-   - `entries` フィールドから `title` を最新30件抽出し、変数 `past_titles` として保持する
-   - ファイルが存在しない場合は `past_titles = []` とする
+1a. Load past article/paper titles to prevent duplicate topics:
+   - If `.cache/history.json` exists, read it and extract the `title` field from the latest 30 `entries` as `past_titles`
+   - If the file does not exist, set `past_titles = []`
 
-2. 全論文をスコアリング（1〜10）:
-   - **HF Daily Papers に掲載されている**: +2点ボーナス（コミュニティの注目度が高い）
-   - 技術的新規性・革新性（既存手法を大きく超える結果・新しいアーキテクチャか）
-   - 実用性（日本のエンジニアが実際に使える手法・ツール・データセットを含むか）
-   - 分かりやすさ（3分程度の動画で概要を伝えられる内容か。理論偏重すぎないか）
-   - `past_titles` に含まれる過去記事・論文と主題・分野・手法が重複または類似する場合は **-3点** のペナルティを与える（ネタ被り防止）
+2. Score all papers (1–10):
+   - **HF Daily Papers listing**: +2 pts bonus (high community attention)
+   - Technical novelty and innovation (significantly outperforms prior work, new architecture)
+   - Practical usefulness (includes methods, tools, or datasets engineers can actually use)
+   - Accessibility (can the key idea be explained in a ~60-second video? not too theory-heavy)
+   - **-3 pts** penalty if the topic, field, or method overlaps with a title in `past_titles`
 
-3. 最高スコアの論文を1件選定（同点は `hf_upvotes` が多い方、さらに同点は新しい方を優先）
+3. Select the highest-scoring paper (tie-break: most `hf_upvotes`, then newest)
 
-4. 選定論文を日本語で処理:
-   - `japanese_title`: 論文タイトルを自然な日本語に意訳（40文字以内）
-   - `japanese_summary`: 論文内容（問題設定・手法・結果）を日本語で詳しく要約（200〜300文字）
-   - `key_points`: 動画スクリプト用の箇条書き3〜5個（各40文字以内）
-     - 例: 「従来比27倍の推論速度を達成」「学習不要でゼロショット適用可能」
+4. Process the selected paper in English:
+   - `english_title`: rephrase the paper title into a punchy English headline (60 chars max)
+   - `english_summary`: detailed English summary of the paper (problem statement, method, results) (200–300 words)
+   - `key_points`: 3–5 bullet points for the video script (each max 15 words)
+     - Examples: "27× faster inference than baseline", "zero-shot, no fine-tuning required"
 
-5. WebSearch ツールで関連情報を調査（2〜3回の検索）:
-   - 選定論文のトピックに関連する背景・類似研究・実用例を検索する
-   - 視聴者（日本のエンジニア）にとって有益な補足情報を収集する
-   - 収集した情報を `related_research` フィールドにまとめる（200〜300文字）
+5. Research related information with the WebSearch tool (2–3 searches):
+   - Search for background, related work, and practical examples for the selected paper's topic
+   - Collect supplementary information useful to a global tech audience
+   - Summarize the collected information in the `related_research` field (200–300 words in English)
 
-6. Write ツールで `.cache/pipeline/02_selected.json` に以下のスキーマで保存:
+6. Save to `.cache/pipeline/02_selected.json` with the Write tool using the schema below:
 
 ```json
 {
-  "title": "原論文タイトル（英語）",
+  "title": "Original paper title (English)",
   "url": "https://arxiv.org/abs/2603.06199",
   "source": "arxiv",
   "image_url": "",
-  "japanese_title": "日本語タイトル（40文字以内）",
-  "japanese_summary": "日本語の詳細要約（200〜300文字）",
+  "english_title": "Punchy English headline (60 chars max)",
+  "english_summary": "Detailed English summary (200–300 words)",
   "interest_score": 8.5,
   "key_points": [
-    "ポイント1（1文、40文字以内）",
-    "ポイント2（1文、40文字以内）",
-    "ポイント3（1文、40文字以内）"
+    "Point 1 (1 sentence, 15 words max)",
+    "Point 2",
+    "Point 3"
   ],
-  "related_research": "WebSearchで調査した関連情報・背景情報（200〜300文字）"
+  "related_research": "Related background information from WebSearch (200–300 words)"
 }
 ```
 
-## エラー処理
+## Error handling
 
-- `01_papers.json` が空の場合はエラーを表示して停止する
-- JSONが正しく生成できない場合は最大2回まで再試行する
+- If `01_papers.json` is empty, display an error and stop
+- If the JSON cannot be generated correctly, retry up to 2 times

@@ -1,88 +1,88 @@
 # /gen-metadata
 
-YouTube投稿用のメタデータ（説明文・タグ）を生成する。
+Generate YouTube upload metadata (description and tags).
 
-## 手順
+## Steps
 
-Read ツールで以下を読み込む:
+Read with the Read tool:
 - `.cache/pipeline/02_selected.json`
 - `.cache/pipeline/03_script.json`
 
-読み込んだ内容をもとに以下を生成する。
+Based on the content, generate the following.
 
-**タグ（`tags`）** - 15〜20個、各30文字以内:
-- 記事固有タグ: 記事に登場する企業名・製品名・技術名を日本語と英語の両方（例: `Firefox`, `ファイアフォックス`）
-- トピックタグ: 記事カテゴリに関する検索されやすい語（例: `セキュリティ`, `AI開発`）
-- 定番タグ: `tech news`, `テックニュース`, `テクノロジー`, `AI`, `人工知能`, `ShortNews`, `Shorts`, `テック`, `{source}`
+**Tags (`tags`)** — 15–20 items, each 30 chars max:
+- Article-specific tags: company names, product names, and technology names from the article (English only)
+- Topic tags: searchable terms for the article category (e.g., `security`, `AI development`, `machine learning`)
+- Fixed tags: `tech news`, `AI`, `ShortNews`, `Shorts`, `technology`, `{source}`
 
-**説明文（`description`）**:
-以下のフォーマットで生成する（タグは上で生成した `tags` 配列の全要素を `#` 付きで並べる）:
+**Description (`description`)**:
+Generate using the following format (tags are all elements of the `tags` array prefixed with `#`):
 
 ```
-元記事: {source_url}
+Source: {source_url}
 
 ---
-このチャンネルでは海外テックニュースを日本語で毎日お届けします。
+Daily AI and tech news in 60 seconds.
 
-#テックニュース #テクノロジー #AI #ShortNews #Shorts #{記事固有タグ1} #{記事固有タグ2} ...
+#TechNews #Technology #AI #ShortNews #Shorts #{article-specific-tag-1} #{article-specific-tag-2} ...
 ```
 
-- `元記事:` の行は必ず先頭に置く
-- ハッシュタグ行は `#テックニュース #テクノロジー #AI #ShortNews #Shorts` を固定先頭に置き、続けて `tags` の記事固有タグを `#` 付きで並べる
-- 記事の要約や箇条書きは含めない
+- The `Source:` line must always come first
+- Hashtag line: start with `#TechNews #Technology #AI #ShortNews #Shorts`, then append article-specific tags
+- Do not include article summaries or bullet points
 
-生成後、Write ツールで `.cache/pipeline/05_metadata.json` に保存:
+Save with the Write tool to `.cache/pipeline/05_metadata.json`:
 
 ```json
 {
-  "description": "生成した説明文",
-  "tags": ["タグ1", "タグ2", "..."],
+  "description": "generated description",
+  "tags": ["tag1", "tag2", "..."],
   "generated_at": "YYYY-MM-DDTHH:MM:SS"
 }
 ```
 
-JSONが正しく生成できない場合は最大1回再試行する。
+If JSON cannot be generated correctly, retry once.
 
-生成完了後、説明文とタグの内容を表示して確認を促す。
+After generation, display the description and tags for review.
 
 ---
 
-## 投稿者コメント生成
+## Poster comment generation
 
-メタデータ保存後、続けて投稿者コメントを生成する。
+After saving metadata, generate a poster comment.
 
-### 手順
+### Steps
 
-1. `source_url` の記事を WebFetch で取得し、本文の詳細情報を抽出する
-2. 記事トピックに関連する補足情報を WebSearch で検索する（関連事件・背景・数字・人物など）
-3. 収集した情報をもとに投稿者コメントを生成する
+1. Fetch the article via WebFetch from `source_url` and extract detailed information
+2. Search for supplementary information with WebSearch (related events, background, numbers, people)
+3. Generate the poster comment from the collected information
 
-### コメントの書き方
+### Comment style
 
-- **敬語（です・ます調）**で書く
-- 動画に入りきらなかった詳細情報・背景・数字・関係者を補足する
-- Web検索で得た関連情報も加えて多角的に考察する
-- 長さの目安: 200〜400文字（段落は2〜3つ）
-- 質問・煽り・絵文字は使わない。淡々とした解説スタイル
+- Write in clear, informative English
+- Supplement with details, background, numbers, and people that didn't make it into the video
+- Add context from web research for a multi-angle perspective
+- Target length: 150–300 words (2–3 paragraphs)
+- No questions, clickbait, or emojis — calm, factual tone
 
-### 保存
+### Save
 
-`.cache/youtube_comments.md`（プロジェクトルート直下の `.cache/`）に以下の形式で追記する。ファイルが存在しない場合は新規作成する。
+Append to `.cache/youtube_comments.md` (in project root `.cache/`) using the format below. Create the file if it does not exist.
 
 ```markdown
-## {動画タイトル（**マークアップなし**）}
+## {Video title (no ** markup)}
 URL: https://youtu.be/{video_id}
-生成日: YYYY-MM-DD
+Generated: YYYY-MM-DD
 
-{コメント本文}
+{Comment body}
 
 ---
 ```
 
-- `{video_id}` がまだ不明な場合（アップロード前）は `URL: （未アップロード）` と記載する。アップロード後に `/upload` コマンドが実際の URL に書き換える。
-- 追記前に `.cache/youtube_comments.md` を Read ツールで読み込み、同じタイトルまたは URL がすでに存在する場合は追記しない（重複防止）。
+- If `{video_id}` is not yet known (before upload), write `URL: (not yet uploaded)`. The `/upload` command will replace this with the actual URL after upload.
+- Before appending, read `.cache/youtube_comments.md` with the Read tool and skip if the same title or URL already exists (duplicate prevention).
 
-## 前提条件
+## Prerequisites
 
-- `.cache/pipeline/02_selected.json` が存在すること
-- `.cache/pipeline/03_script.json` が存在すること
+- `.cache/pipeline/02_selected.json` must exist
+- `.cache/pipeline/03_script.json` must exist

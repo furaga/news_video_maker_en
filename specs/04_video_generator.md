@@ -2,7 +2,7 @@
 
 ## 目的
 
-生成した台本から、VOICEVOX で音声合成し、Pillow で背景画像を生成、moviepy で組み合わせて MP4 動画を出力する。
+Generate MP4 video from the script: synthesize audio with edge-tts, generate background images, and compose with moviepy.
 
 ## 対応コマンド
 
@@ -10,8 +10,8 @@
 
 ## 担当
 
-Python（VOICEVOX + moviepy + Pillow）
-コマンドは `src/news_video_maker/video/` の Python スクリプトを Bash ツールで呼び出す。
+Python (edge-tts + moviepy + Pillow)
+Commands invoke Python scripts in `src/news_video_maker/video/` via the Bash tool.
 
 ---
 
@@ -42,19 +42,17 @@ Python（VOICEVOX + moviepy + Pillow）
 
 ## 振る舞い
 
-### ステップ1: 音声合成（VOICEVOX）
+### Step 1: Audio synthesis (edge-tts)
 
-`src/news_video_maker/video/tts.py` が担当。
+Handled by `src/news_video_maker/video/tts.py`.
 
-各セクションの `narration_text` を VOICEVOX HTTP API で音声合成する:
+Synthesize `narration_text` for each section using the edge-tts Microsoft Neural TTS API:
 
-1. `POST http://localhost:50021/audio_query` でクエリ生成
-   - `speaker`: 設定値（デフォルト: 3 = ずんだもん）
-   - `text`: ナレーションテキスト
-2. `POST http://localhost:50021/synthesis` で WAV 生成
-3. 生成した WAV を `.cache/audio/<section_index>.wav` に保存
+1. Call `edge_tts.Communicate(text, voice).save(output_path)` asynchronously
+2. Save the generated MP3 to `.cache/audio/<section_index>.mp3`
 
-VOICEVOX の話者 ID は `config.py` で設定可能にする。
+The TTS voice is configurable via `TTS_VOICE` in `config.py` (default: `en-US-ChristopherNeural`).
+Internet connection required.
 
 ### ステップ2: 背景画像生成
 
@@ -98,32 +96,28 @@ VOICEVOX の話者 ID は `config.py` で設定可能にする。
 6. `write_videofile()` で MP4 出力
    - `codec="libx264"`, `audio_codec="aac"`, `fps=30`
 
-### 字幕タイミング計算
+### Subtitle timing calculation
 
-字幕チャンクのタイミングは以下の方法で決定する（文字数比率は使用しない）:
+Subtitle chunk timing is determined as follows (not purely character count):
 
-1. `display_text` を 。！？ で文ごとに分割
-2. `narration_text` を同じ区切りで分割（文数が一致していること前提）
-3. 各 `narration_text` の文を VOICEVOX で個別合成し、実際の音声長を測定
-4. 各文の音声長の比率でセクションの総尺を分配
-5. 文内のサブチャンク（`**keyword**` 境界）は文字数比率で按分
+1. Split `narration_text` at English sentence boundaries (`.!?`)
+2. Synthesize each sentence individually with edge-tts and measure actual audio length
+3. Distribute section total duration proportionally to sentence audio lengths
+4. Sub-chunks within a sentence are distributed by character count ratio
 
-この方式により、文字数では予測できない VOICEVOX の読み上げ速度の違いを正確に反映できる。
-個別合成の WAV は `.cache/audio/sentences/` にキャッシュする。
-
-**制約**: `narration_text` と `display_text` の文数（。！？ による区切り数）は一致していなければならない。
+Individual sentence MP3s are cached in `.cache/audio/sentences/`.
 
 ---
 
-## モジュール構成
+## Module structure
 
 ### `src/news_video_maker/video/tts.py`
 
 ```python
-# VOICEVOX HTTP API クライアント
-# 入力: テキスト, 話者ID
-# 出力: WAV ファイルパス
-def synthesize(text: str, speaker_id: int, output_path: Path) -> Path: ...
+# edge-tts English TTS client
+# Input: text, output path
+# Output: MP3 file path
+def synthesize(text: str, output_path: Path, voice: str = TTS_VOICE) -> Path: ...
 ```
 
 ### `src/news_video_maker/video/visuals.py`
@@ -146,25 +140,24 @@ def compose_video(script: VideoScript, output_path: Path) -> Path: ...
 
 ---
 
-## エラー処理
+## Error handling
 
-- **VOICEVOX 接続失敗**: `VOICEVOX_URL` への接続エラー時は詳細メッセージを表示し停止。「VOICEVOXが起動しているか確認してください」とガイドする
-- **VOICEVOX API エラー**: リトライ 3 回（1秒待機）。それでも失敗したら停止
-- **Pillow フォントが見つからない**: フォールバックとして `ImageFont.load_default()` を使用し警告を出す
-- **moviepy レンダリング失敗**: 中間ファイル（WAV・PNG）は保持したままエラーログを出力
+- **edge-tts failure**: display detailed error message and stop; confirm internet connectivity
+- **Pillow font not found**: fall back to `ImageFont.load_default()` with a warning
+- **moviepy rendering failure**: display error log and stop; preserve intermediate files (MP3/PNG)
 
 ---
 
-## 中間ファイル
+## Intermediate files
 
-成功時に以下のキャッシュは **削除しない**（デバッグ・再利用のため保持）:
+The following cache files are **not deleted** on success (kept for debugging and reuse):
 
 ```
 .cache/
   audio/
-    00_hook.wav
-    01_main.wav
-    02_outro.wav
+    00_hook.mp3
+    01_main.mp3
+    02_outro.mp3
   images/
     00_hook.png
     01_main.png
@@ -173,18 +166,17 @@ def compose_video(script: VideoScript, output_path: Path) -> Path: ...
 
 ---
 
-## 実装ノート
+## Implementation notes
 
-- VOICEVOX のエンドポイント: `POST /audio_query?text={text}&speaker={id}` → `POST /synthesis?speaker={id}`
-- moviepy v2 では `concatenate_videoclips` の引数が v1 と異なる場合があるため、`use context7` で `moviepy` の最新 API を確認すること
-- Pillow の `ImageDraw.textbbox()` でテキスト領域を計算してから中央配置する
-- `output/` ディレクトリが存在しない場合は自動作成する
+- edge-tts outputs MP3 (not WAV); moviepy loads MP3 via ffmpeg with no issues
+- For moviepy v2 API differences, use `use context7` to check the latest API
+- `output/` directory is created automatically if it doesn't exist
 
 ---
 
-## テスト方針
+## Test policy
 
 - `tests/video/test_composer.py`
-- VOICEVOX API 呼び出しはモック
-- 実際の WAV ファイル（短い無音）を使った合成テストを最低1件用意
-- 生成された MP4 の存在確認
+- Mock the edge-tts `synthesize()` call
+- At least one synthesis test using a short silent audio file
+- Confirm the generated MP4 file exists

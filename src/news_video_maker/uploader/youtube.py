@@ -93,7 +93,7 @@ def upload_video(
             "description": description,
             "tags": tags,
             "categoryId": "28",  # Science & Technology
-            "defaultLanguage": "ja",
+            "defaultLanguage": "en",
         },
         "status": status_body,
     }
@@ -171,7 +171,7 @@ def main():
     script = json.loads(script_path.read_text(encoding="utf-8"))
 
     # title の **keyword** マークアップ（動画表示専用）を除去
-    raw_title = script.get("title", selected.get("japanese_title", "テックニュース"))
+    raw_title = script.get("title", selected.get("english_title", "Tech News"))
     title = raw_title.replace("**", "")
     source = selected.get("source", "")
     source_url = selected.get("url", "")
@@ -189,7 +189,7 @@ def main():
     except Exception as e:
         logger.warning("メタデータ読み込み失敗。フォールバックを使用します: %s", e)
         description = (
-            f"元記事: {source_url}\n\n"
+            f"Source: {source_url}\n\n"
             "---\n"
             f"{CHANNEL_DESCRIPTION_FOOTER}\n\n"
             f"{CHANNEL_HASHTAGS}"

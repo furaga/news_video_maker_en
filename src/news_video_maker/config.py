@@ -18,12 +18,12 @@ PIPELINE_DIR = CACHE_DIR / "pipeline" / _run_id if _run_id else CACHE_DIR / "pip
 AUDIO_DIR = CACHE_DIR / "audio" / _run_id if _run_id else CACHE_DIR / "audio"
 IMAGES_DIR = CACHE_DIR / "images" / _run_id if _run_id else CACHE_DIR / "images"
 
-# チャンネルブランディング
-CHANNEL_NAME = os.getenv("CHANNEL_NAME", "AIニュース1分解説")
-CHANNEL_HASHTAGS = os.getenv("CHANNEL_HASHTAGS", "#AIニュース #テックニュース #AI #海外テックニュース #ShortNews")
+# Channel branding
+CHANNEL_NAME = os.getenv("CHANNEL_NAME", "AI News in 60 Seconds")
+CHANNEL_HASHTAGS = os.getenv("CHANNEL_HASHTAGS", "#AINews #TechNews #AI #ShortNews #Shorts")
 CHANNEL_DESCRIPTION_FOOTER = os.getenv(
     "CHANNEL_DESCRIPTION_FOOTER",
-    "海外の最新AI・テックニュースを毎日1分でお届けします。\nチャンネル登録で最新情報をいち早くチェック！",
+    "Daily AI and tech news in 60 seconds.\nSubscribe for the latest updates!",
 )
 
 # RSSフィード（総合テック + AI特化）
@@ -48,9 +48,8 @@ MAX_PAPERS = 50
 # 背景画像生成モデル（SD 1.5 互換 fine-tune モデルを指定可能）
 SD_MODEL_ID = os.getenv("SD_MODEL_ID", "Lykon/dreamshaper-8")
 
-# VOICEVOX
-VOICEVOX_URL = os.getenv("VOICEVOX_URL", "http://localhost:50021")
-VOICEVOX_SPEAKER_ID = 13  # 青山龍星
+# edge-tts
+TTS_VOICE = os.getenv("TTS_VOICE", "en-US-ChristopherNeural")
 
 # YouTube
 YOUTUBE_CLIENT_SECRET_PATH = Path(
