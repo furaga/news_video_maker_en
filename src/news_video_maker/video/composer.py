@@ -47,10 +47,14 @@ def _split_display_text(display_text: str, max_chars: int = 26) -> list[str]:
                     consumed += len(kw)
                     i += len(m.group(0))
                 else:
-                    # キーワードがチャンク境界をまたぐ（まれ）→ プレーンテキストとして分割
-                    needed = len(chunk) - consumed
-                    markup_chunk += kw[:needed]
-                    consumed += needed
+                    # キーワードがチャンク境界をまたぐ → 単語の途中で切らないよう次チャンクへ持ち越す
+                    if markup_chunk:
+                        break  # 現チャンクを確定し、キーワードは次チャンクの先頭から処理
+                    else:
+                        # チャンク先頭でもキーワードが長すぎる → 丸ごと含める
+                        markup_chunk += m.group(0)
+                        consumed += len(kw)
+                        i += len(m.group(0))
             else:
                 markup_chunk += display_text[i]
                 consumed += 1
@@ -284,7 +288,7 @@ def compose_video(script: VideoScript, output_path: Path) -> Path:
                 chunks.extend(sub_chunks)
                 chunk_durs.extend(sub_durs)
         else:
-            chunks = _split_display_text(section.narration_text)
+            chunks = _split_display_text(section.narration_text, max_chars=50)
             chunk_durs = _calc_chunk_durations(chunks, duration)
 
         audio = AudioFileClip(str(wav_path))
